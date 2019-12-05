@@ -26,7 +26,7 @@ func do1Command(commands []int, startPosition int, modes []int) int {
 	parameter3 := commands[startPosition+3]
 	sum := handleMode(commands, parameter1, modes[0]) + handleMode(commands, parameter2, modes[1])
 	commands[parameter3] = sum //writes are always mode 0
-	return 4
+	return startPosition + 4
 }
 
 func do2Command(commands []int, startPosition int, modes []int) int {
@@ -35,42 +35,43 @@ func do2Command(commands []int, startPosition int, modes []int) int {
 	parameter3 := commands[startPosition+3]
 	prod := handleMode(commands, parameter1, modes[0]) * handleMode(commands, parameter2, modes[1])
 	commands[parameter3] = prod //writes are always mode 0
-	return 4
+	return startPosition + 4
 }
 
 func do3Command(commands []int, startPosition int, _ []int) int {
 	parameter1 := commands[startPosition+1]
 	var i int
+	fmt.Print("Enter a number: ")
 	_, err := fmt.Scanf("%d", &i)
 	if err != nil {
 		log.Fatal(err)
 	}
 	commands[parameter1] = i //writes are always mode 0
-	return 2
+	return startPosition + 2
 }
 
 func do4Command(commands []int, startPosition int, modes []int) int {
 	parameter1 := commands[startPosition+1]
 	fmt.Println(handleMode(commands, parameter1, modes[0]))
-	return 2
+	return startPosition + 2
 }
 
-func do5Command(commands []int, startPosition int, modes []int) (bool, int) {
+func do5Command(commands []int, startPosition int, modes []int) int {
 	parameter1 := commands[startPosition+1]
 	parameter2 := commands[startPosition+2]
 	if handleMode(commands, parameter1, modes[0]) > 0 {
-		return true, handleMode(commands, parameter2, modes[1])
+		return handleMode(commands, parameter2, modes[1])
 	} else {
-		return false, 3
+		return startPosition + 3
 	}
 }
-func do6Command(commands []int, startPosition int, modes []int) (bool, int) {
+func do6Command(commands []int, startPosition int, modes []int) int {
 	parameter1 := commands[startPosition+1]
 	parameter2 := commands[startPosition+2]
 	if handleMode(commands, parameter1, modes[0]) == 0 {
-		return true, handleMode(commands, parameter2, modes[1])
+		return handleMode(commands, parameter2, modes[1])
 	} else {
-		return false, 3
+		return startPosition + 3
 	}
 }
 func do7Command(commands []int, startPosition int, modes []int) int {
@@ -82,7 +83,7 @@ func do7Command(commands []int, startPosition int, modes []int) int {
 	} else {
 		commands[parameter3] = 0
 	}
-	return 4
+	return startPosition + 4
 }
 func do8Command(commands []int, startPosition int, modes []int) int {
 	parameter1 := commands[startPosition+1]
@@ -93,7 +94,7 @@ func do8Command(commands []int, startPosition int, modes []int) int {
 	} else {
 		commands[parameter3] = 0
 	}
-	return 4
+	return startPosition + 4
 }
 
 func parseCommand(command int) (opCode int, mode []int) {
@@ -113,31 +114,21 @@ func doCommands(commands []int) {
 		opCode, modes := parseCommand(commands[instructionPointer])
 		switch opCode {
 		case 1:
-			instructionPointer += do1Command(commands, instructionPointer, modes)
+			instructionPointer = do1Command(commands, instructionPointer, modes)
 		case 2:
-			instructionPointer += do2Command(commands, instructionPointer, modes)
+			instructionPointer = do2Command(commands, instructionPointer, modes)
 		case 3:
-			instructionPointer += do3Command(commands, instructionPointer, modes)
+			instructionPointer = do3Command(commands, instructionPointer, modes)
 		case 4:
-			instructionPointer += do4Command(commands, instructionPointer, modes)
+			instructionPointer = do4Command(commands, instructionPointer, modes)
 		case 5:
-			jump, value := do5Command(commands, instructionPointer, modes)
-			if jump {
-				instructionPointer = value
-			} else {
-				instructionPointer += value
-			}
+			instructionPointer = do5Command(commands, instructionPointer, modes)
 		case 6:
-			jump, value := do6Command(commands, instructionPointer, modes)
-			if jump {
-				instructionPointer = value
-			} else {
-				instructionPointer += value
-			}
+			instructionPointer = do6Command(commands, instructionPointer, modes)
 		case 7:
-			instructionPointer += do7Command(commands, instructionPointer, modes)
+			instructionPointer = do7Command(commands, instructionPointer, modes)
 		case 8:
-			instructionPointer += do8Command(commands, instructionPointer, modes)
+			instructionPointer = do8Command(commands, instructionPointer, modes)
 		case 99:
 			return
 		}
