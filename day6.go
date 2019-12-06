@@ -12,32 +12,31 @@ func parseOrbit(value string) []string {
 	return strings.Split(value, ")")
 }
 
-func computePath(start string, orbits map[string]string) []string {
-	var path []string
+func computePath(start string, orbits map[string]string) map[string]bool {
+	var path = make(map[string]bool)
 	current := start
 	for {
 		if current == "COM" {
 			return path
 		}
-		path = append(path, current)
+		path[current] = true
 		current = orbits[current]
 	}
 }
 
-func shortestPath(path1 []string, path2 []string) int {
-	path1Len := 0
-	for _, step1 := range path1 {
-		path2Len := 0
-		for _, step2 := range path2 {
-			//fmt.Printf("%s ? %s", step1, step2)
-			if step1 == step2 {
-				return path1Len + path2Len
-			}
-			path2Len += 1
+func shortestPath(path1 map[string]bool, path2 map[string]bool) int {
+	total := 0
+	for star, _ := range path1 {
+		if _, ok := path2[star]; !ok {
+			total++
 		}
-		path1Len += 1
 	}
-	return -1
+	for star, _ := range path2 {
+		if _, ok := path1[star]; !ok {
+			total++
+		}
+	}
+	return total
 }
 
 func main() {
