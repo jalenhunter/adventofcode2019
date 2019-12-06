@@ -8,25 +8,36 @@ import (
 	"strings"
 )
 
-func parseOrbit(value string) (center string, orbiter string) {
-	i := strings.Index(value, ")")
-	return value[0:i], value[i+1:]
+func parseOrbit(value string) []string {
+	return strings.Split(value, ")")
 }
 
-func walkBackOrbit(start string, orbits map[string]string) int {
-	if start == "COM" {
-		return 0
-	} else {
-		return 1 + walkBackOrbit(orbits[start], orbits)
+func computePath(start string, orbits map[string]string) []string {
+	var path []string
+	current := start
+	for {
+		if current == "COM" {
+			return path
+		}
+		path = append(path, current)
+		current = orbits[current]
 	}
 }
 
-func computeChecksum(orbits map[string]string) int {
-	total := 0
-	for k := range orbits {
-		total += walkBackOrbit(k, orbits)
+func shortestPath(path1 []string, path2 []string) int {
+	path1Len := 0
+	for _, step1 := range path1 {
+		path2Len := 0
+		for _, step2 := range path2 {
+			//fmt.Printf("%s ? %s", step1, step2)
+			if step1 == step2 {
+				return path1Len + path2Len
+			}
+			path2Len += 1
+		}
+		path1Len += 1
 	}
-	return total
+	return -1
 }
 
 func main() {
@@ -41,12 +52,14 @@ func main() {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		data := scanner.Text()
-		value, key := parseOrbit(data)
-		orbits[key] = value
+		values := parseOrbit(data)
+		orbits[values[1]] = values[0]
 	}
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(computeChecksum(orbits))
+	myPath := computePath(orbits["YOU"], orbits)
+	santaPath := computePath(orbits["SAN"], orbits)
 
+	fmt.Println(shortestPath(myPath, santaPath))
 }
