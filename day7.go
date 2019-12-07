@@ -7,9 +7,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 )
-
-var silent = true
 
 func handleMode(commands []int, param int, mode int) int {
 	if mode == 0 { //reference
@@ -40,25 +39,15 @@ func do2Command(commands []int, startPosition int, modes []int) int {
 	return startPosition + 4
 }
 
-func do3Command(commands []int, startPosition int, _ []int) int {
-	if !silent {
-		parameter1 := commands[startPosition+1]
-		var i int
-		fmt.Print("Enter a number: ")
-		_, err := fmt.Scanf("%d", &i)
-		if err != nil {
-			log.Fatal(err)
-		}
-		commands[parameter1] = i //writes are always mode 0
-	}
+func do3Command(index int, commands []int, startPosition int, input chan int) int {
+	parameter1 := commands[startPosition+1]
+	commands[parameter1] = <-input
 	return startPosition + 2
 }
 
-func do4Command(commands []int, startPosition int, modes []int) int {
-	if !silent {
-		parameter1 := commands[startPosition+1]
-		fmt.Println(handleMode(commands, parameter1, modes[0]))
-	}
+func do4Command(index int, commands []int, startPosition int, modes []int, output chan int) int {
+	parameter1 := commands[startPosition+1]
+	output <- handleMode(commands, parameter1, modes[0])
 	return startPosition + 2
 }
 
@@ -114,7 +103,7 @@ func parseCommand(command int) (opCode int, mode []int) {
 	return code, paramMode
 }
 
-func doCommands(commands []int) {
+func doCommands(index int, commands []int, input chan int, output chan int, wg *sync.WaitGroup) {
 	instructionPointer := 0
 	for {
 		opCode, modes := parseCommand(commands[instructionPointer])
@@ -124,9 +113,9 @@ func doCommands(commands []int) {
 		case 2:
 			instructionPointer = do2Command(commands, instructionPointer, modes)
 		case 3:
-			instructionPointer = do3Command(commands, instructionPointer, modes)
+			instructionPointer = do3Command(index, commands, instructionPointer, input)
 		case 4:
-			instructionPointer = do4Command(commands, instructionPointer, modes)
+			instructionPointer = do4Command(index, commands, instructionPointer, modes, output)
 		case 5:
 			instructionPointer = do5Command(commands, instructionPointer, modes)
 		case 6:
@@ -136,6 +125,11 @@ func doCommands(commands []int) {
 		case 8:
 			instructionPointer = do8Command(commands, instructionPointer, modes)
 		case 99:
+			if wg != nil {
+				wg.Done()
+			}
+			close(output)
+			//fmt.Printf("Closing Amp %d\n", index)
 			return
 		}
 	}
@@ -173,7 +167,7 @@ func perm(a []rune, f func([]rune), i int) {
 
 func createPermutations() []string {
 	var result []string
-	Perm([]rune("01234"), func(a []rune) {
+	Perm([]rune("56789"), func(a []rune) {
 		result = append(result, string(a))
 	})
 	return result
@@ -200,20 +194,31 @@ func main() {
 	maxThrust := 0
 	var bestSetting string
 	for _, permutation := range createPermutations() {
-		inputSignal := 0
-		for _, phase := range permutation {
+		var chans [5]chan int
+		for i := range chans {
+			chans[i] = make(chan int)
+		}
+		var wg sync.WaitGroup
+		for index, phase := range permutation {
 			testMemory := append(memory[:0:0], memory...)
 			v, err := strconv.Atoi(string(phase))
 			if err != nil {
 				log.Fatal(err)
 			}
-			testMemory[8] = v
-			testMemory[9] = inputSignal
-			doCommands(testMemory)
-			inputSignal = testMemory[9]
+			if index == 4 {
+				go doCommands(index, testMemory, chans[index], chans[0], nil)
+			} else {
+				wg.Add(1)
+				go doCommands(index, testMemory, chans[index], chans[index+1], &wg)
+			}
+			chans[index] <- v
 		}
-		if inputSignal > maxThrust {
-			maxThrust = inputSignal
+		chans[0] <- 0
+		wg.Wait()
+		value := <-chans[0]
+		//fmt.Println("Got Answer:", value)
+		if value > maxThrust {
+			maxThrust = value
 			bestSetting = permutation
 		}
 	}
