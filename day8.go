@@ -3,9 +3,51 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"log"
 	"os"
 )
+
+type Layer [6][25]int
+
+func printLayer(layer Layer) {
+	for j := 0; j < 6; j++ {
+		for i := 0; i < 25; i++ {
+			if layer[j][i] == 1 {
+				fmt.Print("\xE2\x96\xA0")
+			} else {
+				fmt.Print(" ")
+			}
+		}
+		fmt.Println()
+	}
+	fmt.Println()
+	fmt.Println()
+}
+
+func makeImage(layer Layer) {
+	rectangle := image.Rectangle{Min: image.Point{X: 0, Y: 0}, Max: image.Point{X: 25, Y: 6}}
+	passwordImage := image.NewRGBA(rectangle)
+	for j := 0; j < 6; j++ {
+		for i := 0; i < 25; i++ {
+			if layer[j][i] == 1 {
+				passwordImage.Set(i, j, color.White)
+			} else {
+				passwordImage.Set(i, j, color.Black)
+			}
+		}
+	}
+	file, err := os.Create("password.png")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = png.Encode(file, passwordImage)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
 
 func main() {
 	argsWithoutProg := os.Args[1:]
@@ -23,27 +65,24 @@ func main() {
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(len(data))
 	pixel := 0
 	layers := len(data) / (25 * 6)
-	leastZero := 10000000
-	checksum := 0
+	layersData := make([]Layer, layers)
+
 	for layer := 0; layer < layers; layer++ {
-		zeros := 0
-		ones := 0
-		twos := 0
-		for i := 0; i < 25; i++ {
-			for j := 0; j < 6; j++ {
+		var layerData Layer
+		for j := 0; j < 6; j++ {
+			for i := 0; i < 25; i++ {
 				char := data[pixel]
 				switch char {
 				case '0':
-					zeros++
+					layerData[j][i] = 0
 					break
 				case '1':
-					ones++
+					layerData[j][i] = 1
 					break
 				case '2':
-					twos++
+					layerData[j][i] = 2
 					break
 				default:
 					log.Fatal(char)
@@ -51,11 +90,25 @@ func main() {
 				pixel++
 			}
 		}
-		if zeros < leastZero {
-			leastZero = zeros
-			checksum = ones * twos
+		layersData[layer] = layerData
+	}
+	var final [6][25]int
+	for i := 0; i < 25; i++ {
+		for j := 0; j < 6; j++ {
+			final[j][i] = 2
 		}
 	}
-	fmt.Println(checksum)
 
+	for layer := 0; layer < layers; layer++ {
+		for j := 0; j < 6; j++ {
+			for i := 0; i < 25; i++ {
+				if layersData[layer][j][i] != 2 && final[j][i] == 2 {
+					final[j][i] = layersData[layer][j][i]
+				}
+			}
+		}
+	}
+
+	printLayer(final)
+	makeImage(final)
 }
