@@ -39,13 +39,13 @@ func do2Command(commands []int, startPosition int, modes []int) int {
 	return startPosition + 4
 }
 
-func do3Command(index int, commands []int, startPosition int, input chan int) int {
+func do3Command(commands []int, startPosition int, input chan int) int {
 	parameter1 := commands[startPosition+1]
 	commands[parameter1] = <-input
 	return startPosition + 2
 }
 
-func do4Command(index int, commands []int, startPosition int, modes []int, output chan int) int {
+func do4Command(commands []int, startPosition int, modes []int, output chan int) int {
 	parameter1 := commands[startPosition+1]
 	output <- handleMode(commands, parameter1, modes[0])
 	return startPosition + 2
@@ -103,7 +103,7 @@ func parseCommand(command int) (opCode int, mode []int) {
 	return code, paramMode
 }
 
-func doCommands(index int, commands []int, input chan int, output chan int, wg *sync.WaitGroup) {
+func doCommands(commands []int, input chan int, output chan int, wg *sync.WaitGroup) {
 	instructionPointer := 0
 	for {
 		opCode, modes := parseCommand(commands[instructionPointer])
@@ -113,9 +113,9 @@ func doCommands(index int, commands []int, input chan int, output chan int, wg *
 		case 2:
 			instructionPointer = do2Command(commands, instructionPointer, modes)
 		case 3:
-			instructionPointer = do3Command(index, commands, instructionPointer, input)
+			instructionPointer = do3Command(commands, instructionPointer, input)
 		case 4:
-			instructionPointer = do4Command(index, commands, instructionPointer, modes, output)
+			instructionPointer = do4Command(commands, instructionPointer, modes, output)
 		case 5:
 			instructionPointer = do5Command(commands, instructionPointer, modes)
 		case 6:
@@ -206,10 +206,10 @@ func main() {
 				log.Fatal(err)
 			}
 			if index == 4 {
-				go doCommands(index, testMemory, chans[index], chans[0], nil)
+				go doCommands(testMemory, chans[index], chans[0], nil)
 			} else {
 				wg.Add(1)
-				go doCommands(index, testMemory, chans[index], chans[index+1], &wg)
+				go doCommands(testMemory, chans[index], chans[index+1], &wg)
 			}
 			chans[index] <- v
 		}
