@@ -3,6 +3,9 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"log"
 	"os"
 	"strconv"
@@ -12,7 +15,7 @@ import (
 type Point struct {
 	x     int
 	y     int
-	Color int
+	color int
 }
 
 func handleModeRead(commands []int64, param int64, mode int, position int) int64 {
@@ -225,7 +228,7 @@ func moveOne(points []*Point, direction string, position *Point) (*Point, []*Poi
 
 	switch direction {
 	case "U":
-		y += 1
+		y -= 1
 		break
 	case "L":
 		x -= 1
@@ -234,7 +237,7 @@ func moveOne(points []*Point, direction string, position *Point) (*Point, []*Poi
 		x += 1
 		break
 	case "D":
-		y -= 1
+		y += 1
 		break
 	}
 	newPoint := pointExists(points, x, y)
@@ -271,7 +274,14 @@ func main() {
 	// overwrite per instructions
 	memory = append(memory, make([]int64, 1000)...)
 	go doCommands(memory, input, output, state)
-	position := &Point{0, 0, 0}
+	rectangle := image.Rectangle{Min: image.Point{X: 0, Y: 0}, Max: image.Point{X: 100, Y: 100}}
+	registrationImage := image.NewRGBA(rectangle)
+	for j := 0; j < 100; j++ {
+		for i := 0; i < 100; i++ {
+			registrationImage.Set(i, j, color.Black)
+		}
+	}
+	position := &Point{20, 20, 1}
 	points = append(points, position)
 	currentDirection := "U"
 	for {
@@ -280,11 +290,16 @@ func main() {
 			break
 		}
 		if progState == 3 {
-			input <- position.Color
+			input <- position.color
 			//read number 1 is color
-			color := <-output
+			pixelColor := <-output
+			if pixelColor == 1 {
+				registrationImage.Set(position.x, position.y, color.White)
+			} else {
+				registrationImage.Set(position.x, position.y, color.Black)
+			}
 			//fmt.Println(color)
-			position.Color = int(color)
+			position.color = int(pixelColor)
 			// read number 2 is turn
 			turn := <-output
 			currentDirection = newDirection(currentDirection, turn)
@@ -294,5 +309,12 @@ func main() {
 	}
 	close(input)
 	close(output)
-	fmt.Println(len(points))
+	outFile, err := os.Create("registration.png")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = png.Encode(outFile, registrationImage)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
