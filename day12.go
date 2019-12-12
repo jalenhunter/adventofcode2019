@@ -46,11 +46,54 @@ func computeVel(moon Moon, moons []Moon) (int, int, int) {
 	return dx, dy, dz
 }
 
-func Abs(x int) int {
-	if x < 0 {
-		return -x
+func hashX(moons []Moon) string {
+	str := ""
+	for index, _ := range moons {
+		str += strconv.Itoa(moons[index].x) + "," + strconv.Itoa(moons[index].vX)
+		if index != 3 {
+			str += ","
+		}
 	}
-	return x
+	return str
+}
+func hashY(moons []Moon) string {
+	str := ""
+	for index, _ := range moons {
+		str += strconv.Itoa(moons[index].y) + "," + strconv.Itoa(moons[index].vY)
+		if index != 3 {
+			str += ","
+		}
+	}
+	return str
+}
+func hashZ(moons []Moon) string {
+	str := ""
+	for index, _ := range moons {
+		str += strconv.Itoa(moons[index].z) + "," + strconv.Itoa(moons[index].vZ)
+		if index != 3 {
+			str += ","
+		}
+	}
+	return str
+}
+
+func GCD(a, b int) int {
+	for b != 0 {
+		t := b
+		b = a % b
+		a = t
+	}
+	return a
+}
+
+func LCM(a, b int, integers ...int) int {
+	result := a * b / GCD(a, b)
+
+	for i := 0; i < len(integers); i++ {
+		result = LCM(result, integers[i])
+	}
+
+	return result
 }
 
 func main() {
@@ -73,7 +116,12 @@ func main() {
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
 	}
-	for i := 0; i < 1000; i++ {
+	var steps int = 0
+	var xStates = make(map[string]bool)
+	var yStates = make(map[string]bool)
+	var zStates = make(map[string]bool)
+	xStep, yStep, zStep := 0, 0, 0
+	for {
 		//do the velocity
 		for index, moon := range moons {
 			dx, dy, dz := computeVel(moon, moons)
@@ -85,14 +133,35 @@ func main() {
 		for index, _ := range moons {
 			moons[index].x, moons[index].y, moons[index].z = moons[index].x+moons[index].vX, moons[index].y+moons[index].vY, moons[index].z+moons[index].vZ
 		}
-		//fmt.Println(moons)
+		xStr := hashX(moons)
+		if _, ok := xStates[xStr]; ok {
+			if xStep == 0 {
+				xStep = steps
+			}
+		} else {
+			xStates[xStr] = true
+		}
+		yStr := hashY(moons)
+		if _, ok := yStates[yStr]; ok {
+			if yStep == 0 {
+				yStep = steps
+			}
+		} else {
+			yStates[yStr] = true
+		}
+		zStr := hashZ(moons)
+		if _, ok := zStates[zStr]; ok {
+			if zStep == 0 {
+				zStep = steps
+			}
+		} else {
+			zStates[zStr] = true
+		}
+		if xStep > 0 && yStep > 0 && zStep > 0 {
+			break
+		}
+		steps++
 	}
-	//compute
-	total := 0
-	for _, moon := range moons {
-		total += (Abs(moon.x) + Abs(moon.y) + Abs(moon.z)) * (Abs(moon.vX) + Abs(moon.vY) + Abs(moon.vZ))
-		//fmt.Println(total)
-	}
-	fmt.Println(total)
-
+	fmt.Println(xStep, yStep, zStep)
+	fmt.Println(LCM(xStep, yStep, zStep))
 }
