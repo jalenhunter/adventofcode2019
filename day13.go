@@ -10,9 +10,8 @@ import (
 )
 
 type Point struct {
-	x    int64
-	y    int64
-	tile int64
+	x int64
+	y int64
 }
 
 func handleModeRead(commands []int64, param int64, mode int, position int) int64 {
@@ -59,6 +58,7 @@ func do2Command(commands []int64, startPosition int, modes []int, position int) 
 }
 
 func do3Command(commands []int64, startPosition int, modes []int, position int, input chan int) int {
+	fmt.Println("Need Input")
 	parameter1 := commands[startPosition+1]
 	var i = <-input
 	handleModeWrite(commands, parameter1, modes[0], position, int64(i))
@@ -172,6 +172,15 @@ func toInt(input []string) []int64 {
 	return data
 }
 
+func determineInput(ball Point, paddle Point) int {
+	if ball.x > paddle.x {
+		return 1
+	} else if ball.x < paddle.x {
+		return -1
+	}
+	return 0
+}
+
 func main() {
 	argsWithoutProg := os.Args[1:]
 	file, err := os.Open(argsWithoutProg[0])
@@ -181,8 +190,10 @@ func main() {
 	defer file.Close()
 	input := make(chan int)
 	output := make(chan int64)
-	total := 0
-	var points = make(map[Point]bool)
+	var blocks = make(map[Point]bool)
+	var walls = make(map[Point]bool)
+	var paddle Point
+	var ball Point
 	data := ""
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -194,6 +205,9 @@ func main() {
 	memory := toInt(strings.Split(data, ","))
 	// overwrite per instructions
 	memory = append(memory, make([]int64, 1000)...)
+	memory[0] = 2
+	var currentScore int64 = 0
+	started := false
 	go doCommands(memory, input, output)
 	for {
 		x, ok := <-output
@@ -202,11 +216,38 @@ func main() {
 		}
 		y := <-output
 		tile := <-output
-		if tile == 2 {
-			total += 1
+		if x == -1 && y == 0 {
+			currentScore = tile
+			fmt.Println("SCORE: ", currentScore)
+			if !started {
+				input <- determineInput(ball, paddle)
+			}
+			started = true
+		} else {
+			switch tile {
+			case 1:
+				walls[Point{x, y}] = true
+				break
+			case 2:
+				blocks[Point{x, y}] = true
+				break
+			case 3:
+				paddle = Point{x, y}
+				fmt.Println("Paddle:", paddle)
+				break
+			case 4:
+				ball = Point{x, y}
+				fmt.Println("Ball:", ball)
+				if started {
+					input <- determineInput(ball, paddle)
+				}
+				break
+			default:
+				break
+			}
 		}
-		points[Point{x, y, tile}] = true
+
 	}
 	close(input)
-	fmt.Println(total)
+
 }
