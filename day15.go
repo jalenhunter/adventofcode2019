@@ -174,48 +174,22 @@ func toInt(input []string) []int {
 
 func getNextDirection(x int, y int) int {
 	return rand.Intn(4) + 1
-
-	//for {
-	//	testDir := rand.Intn(4) + 1
-	//	var status = -1
-	//	switch testDir {
-	//	case 1:
-	//		status = locations[x][y + 1]
-	//		break
-	//	case 2:
-	//		status = locations[x][y - 1]
-	//		break
-	//	case 3:
-	//		status = locations[x + 1][y]
-	//		break
-	//	case 4:
-	//		status = locations[x - 1][y]
-	//		break
-	//	}
-	//	if status == 1 || status == -1{
-	//		return testDir
-	//	}
-	//}
 }
 
-func printLocations(actual bool) {
+func printLocations() {
 	for j := 0; j < size; j++ {
 		for i := 0; i < size; i++ {
-			if actual {
-				fmt.Print(locations[j][i])
+			if j == size/2 && i == size/2 {
+				fmt.Print("S")
 			} else {
-				if j == size/2 && i == size/2 {
-					fmt.Print("S")
+				if locations[j][i] == 0 {
+					fmt.Print("W")
+				} else if locations[j][i] == 2 {
+					fmt.Print("X")
+				} else if locations[j][i] > 1 {
+					fmt.Print("O")
 				} else {
-					if locations[j][i] == 0 {
-						fmt.Print("O")
-					} else if locations[j][i] == 2 {
-						fmt.Print("X")
-					} else if locations[j][i] > 1 {
-						fmt.Print(" ")
-					} else {
-						fmt.Print("U")
-					}
+					fmt.Print(" ")
 				}
 			}
 		}
@@ -247,7 +221,6 @@ func main() {
 			locations[i][j] = -1
 		}
 	}
-	//printLocations(true)
 	rand.Seed(time.Now().UnixNano())
 	argsWithoutProg := os.Args[1:]
 	file, err := os.Open(argsWithoutProg[0])
@@ -277,14 +250,12 @@ func main() {
 	distance := 0
 	for {
 		dir = getNextDirection(x, y)
-		//fmt.Print(dir, ":")
 		input <- dir
 		status, ok := <-output
 		if !ok {
 			fmt.Println("What happened to the program?")
 			break
 		}
-		//fmt.Print(status, " ")
 		a, b := getNextPosition(x, y, dir)
 		switch status {
 		case 0: //wall
@@ -314,8 +285,63 @@ func main() {
 			break
 		}
 	}
-	//printLocations(false)
 	fmt.Println(distance)
+	for i := 0; i < size; i++ {
+		for j := 0; j < size; j++ {
+			if locations[i][j] > 0 {
+				locations[i][j] = -1
+			}
+		}
+	}
+	locations[x][y] = 2
+	var count int64 = 0
+	minutes := 0
+	maxMinutes := 0
+	for {
+		dir = getNextDirection(x, y)
+		//fmt.Print(dir, ":")
+		input <- dir
+		status, ok := <-output
+		if !ok {
+			fmt.Println("What happened to the program?")
+			break
+		}
+		count++
+		//fmt.Print(status, " ")
+		a, b := getNextPosition(x, y, dir)
+		switch status {
+		case 0: //wall
+			locations[a][b] = 0
+			break
+		case 1: //clear
+			if locations[a][b] < 0 {
+				minutes++
+				locations[a][b] = minutes
+			} else {
+				minutes = locations[a][b]
+			}
+			x, y = a, b
+			break
+		case 2: //oxygen
+			minutes = 0
+			x, y = a, b
+			break
+		default:
+			fmt.Println("Unknown value from computer:", status)
+			break
+		}
+		if minutes > maxMinutes {
+			maxMinutes = minutes
+			if maxMinutes > distance {
+				fmt.Println("Max is now ", maxMinutes)
+			}
+		}
+		if count > 100000000 {
+			break
+		}
+	}
+	printLocations()
+	fmt.Println(maxMinutes)
 	close(input)
 
 }
