@@ -76,7 +76,7 @@ func getOre(fuel int64, reactions []Reaction) int64 {
 		n := len(needs) - 1
 		next := needs[n]
 		needs = needs[:n]
-		fmt.Println(needs)
+		//fmt.Println(needs)
 		chemicals := getChemicals(next.amount, next.name, reactions)
 		for name, value := range chemicals {
 			if name == "ORE" {
