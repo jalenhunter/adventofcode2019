@@ -65,32 +65,27 @@ func getChemicals(qty int64, chem string, reactions []Reaction) map[string]int64
 	return make(map[string]int64)
 }
 
-func firstKey(needs map[string]int64) string {
-	for key, _ := range needs {
-		return key
-	}
-	return ""
-}
-
 func getOre(fuel int64, reactions []Reaction) int64 {
 	var ore int64 = 0
-	needs := make(map[string]int64)
-	needs["FUEL"] = fuel
-	for {
-		key := firstKey(needs)
-		if len(key) == 0 {
-			break
-		}
-		qty := needs[key]
-		delete(needs, key)
-		//fmt.Println(key, qty)
-		chemicals := getChemicals(qty, key, reactions)
-		//fmt.Println(chemicals)
+	var needs []Chem
+	needs = append(needs, Chem{
+		name:   "FUEL",
+		amount: fuel,
+	})
+	for len(needs) > 0 {
+		n := len(needs) - 1
+		next := needs[n]
+		needs = needs[:n]
+		fmt.Println(needs)
+		chemicals := getChemicals(next.amount, next.name, reactions)
 		for name, value := range chemicals {
 			if name == "ORE" {
 				ore += value
 			} else {
-				needs[name] += value
+				needs = append(needs, Chem{
+					name:   name,
+					amount: value,
+				})
 			}
 		}
 	}
