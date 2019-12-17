@@ -9,8 +9,6 @@ import (
 	"strings"
 )
 
-var space [][]rune
-
 func handleModeRead(commands []int64, param int64, mode int, position int) int64 {
 	if mode == 0 { //reference
 		return commands[param]
@@ -54,16 +52,17 @@ func do2Command(commands []int64, startPosition int, modes []int, position int) 
 	return startPosition + 4
 }
 
-func do3Command(commands []int64, startPosition int, modes []int, position int, input chan int) int {
-	fmt.Println("Need Input")
+func do3Command(commands []int64, startPosition int, modes []int, position int, input chan int, state chan int) int {
 	parameter1 := commands[startPosition+1]
+	state <- 3
 	var i = <-input
 	handleModeWrite(commands, parameter1, modes[0], position, int64(i))
 	return startPosition + 2
 }
 
-func do4Command(commands []int64, startPosition int, modes []int, position int, output chan int64) int {
+func do4Command(commands []int64, startPosition int, modes []int, position int, output chan int64, state chan int) int {
 	parameter1 := commands[startPosition+1]
+	state <- 4
 	output <- handleModeRead(commands, parameter1, modes[0], position)
 	return startPosition + 2
 }
@@ -126,7 +125,7 @@ func parseCommand(command int64) (opCode int, mode []int) {
 	return int(code), paramMode
 }
 
-func doCommands(commands []int64, input chan int, output chan int64) {
+func doCommands(commands []int64, input chan int, output chan int64, state chan int) {
 	instructionPointer := 0
 	position := 0
 	for {
@@ -137,9 +136,9 @@ func doCommands(commands []int64, input chan int, output chan int64) {
 		case 2:
 			instructionPointer = do2Command(commands, instructionPointer, modes, position)
 		case 3:
-			instructionPointer = do3Command(commands, instructionPointer, modes, position, input)
+			instructionPointer = do3Command(commands, instructionPointer, modes, position, input, state)
 		case 4:
-			instructionPointer = do4Command(commands, instructionPointer, modes, position, output)
+			instructionPointer = do4Command(commands, instructionPointer, modes, position, output, state)
 		case 5:
 			instructionPointer = do5Command(commands, instructionPointer, modes, position)
 		case 6:
@@ -151,7 +150,7 @@ func doCommands(commands []int64, input chan int, output chan int64) {
 		case 9:
 			instructionPointer, position = do9Command(commands, instructionPointer, modes, position)
 		case 99:
-			close(output)
+			close(state)
 			return
 		}
 	}
@@ -178,6 +177,7 @@ func main() {
 	defer file.Close()
 	input := make(chan int)
 	output := make(chan int64)
+	state := make(chan int)
 	data := ""
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -187,51 +187,71 @@ func main() {
 		log.Fatal(err)
 	}
 	memory := toInt(strings.Split(data, ","))
-	// overwrite per instructions
 	memory = append(memory, make([]int64, 10000)...)
-	go doCommands(memory, input, output)
-	space = make([][]rune, 100)
-	for i := 0; i < 100; i++ {
-		space[i] = make([]rune, 100)
-	}
+	memory[0] = 2
+	go doCommands(memory, input, output, state)
+	handleIO(input, output, state)
+	close(output)
+	close(input)
+}
 
-	width, height := 0, 0
+func handleIO(input chan int, output chan int64, state chan int) {
 
+	main := []int{A, COMMA, A, COMMA, B, COMMA, C, COMMA, B, COMMA, A, COMMA, C, COMMA, B, COMMA, C, COMMA, A, NEWLINE}
+	//L,6,R,12,L,6,L,8,L,8,8NEWLINE
+	a := []int{L, COMMA, 54, COMMA, R, COMMA, 49, 50, COMMA, L, COMMA, 54, COMMA, L, COMMA, 56, COMMA, L, COMMA, 56, NEWLINE}
+	//L,6,R,12,R,8,L,8,NEWLINE
+	b := []int{L, COMMA, 54, COMMA, R, COMMA, 49, 50, COMMA, R, COMMA, 56, COMMA, L, COMMA, 56, NEWLINE}
+	//L,4,L,4,L,6,NEWLINE
+	c := []int{L, COMMA, 52, COMMA, L, COMMA, 52, COMMA, L, COMMA, 54, NEWLINE}
+	noUpdate := []int{110, NEWLINE}
+	prog := 0
+	pos := 0
 	for {
-		x, ok := <-output
+		progState, ok := <-state
 		if !ok {
 			break
 		}
-		if x == 10 {
-			height++
-			width = 0
-		} else {
-			space[height][width] = rune(x)
-			width++
-		}
-	}
-	total := 0
-	for y := 1; y < 99; y++ {
-		for x := 1; x < 99; x++ {
-			if isIntersection(x, y) {
-				total += x * y
+		if progState == 3 {
+			var code int
+			switch prog {
+			case 0:
+				code = main[pos]
+				break
+			case 1:
+				code = a[pos]
+				break
+			case 2:
+				code = b[pos]
+				break
+			case 3:
+				code = c[pos]
+				break
+			case 4:
+				code = noUpdate[pos]
+				break
+			}
+			pos++
+			if code == NEWLINE {
+				prog++
+				pos = 0
+			}
+			input <- code
+		} else if progState == 4 {
+			out := <-output
+			if out > 128 {
+				fmt.Println(out)
 			}
 		}
 	}
-	fmt.Println(total)
-	close(input)
-
 }
 
-func isScaffold(r rune) bool {
-	switch r {
-	case '#', '<', '>', 'v', '^':
-		return true
-	default:
-		return false
-	}
-}
-
-func isIntersection(x int, y int) bool {
-	return isScaffold(space[y][x]) && isScaffold(space[y+1][x]) && isScaffold(space[y-1][x]) && isScaffold(space[y][x+1]) && isScaffold(space[y][x-1])
-}
+const (
+	NEWLINE int = 10
+	A       int = 65
+	B       int = 66
+	C       int = 67
+	L       int = 76
+	R       int = 82
+	COMMA   int = 44
+)
