@@ -9,6 +9,10 @@ import (
 	"strings"
 )
 
+type input func() int
+type output func(int64)
+type result func() int64
+
 func handleModeRead(commands []int64, param int64, mode int, position int) int64 {
 	if mode == 0 { //reference
 		return commands[param]
@@ -52,18 +56,15 @@ func do2Command(commands []int64, startPosition int, modes []int, position int) 
 	return startPosition + 4
 }
 
-func do3Command(commands []int64, startPosition int, modes []int, position int, input chan int, state chan int) int {
+func do3Command(commands []int64, startPosition int, modes []int, position int, in input) int {
 	parameter1 := commands[startPosition+1]
-	state <- 3
-	var i = <-input
-	handleModeWrite(commands, parameter1, modes[0], position, int64(i))
+	handleModeWrite(commands, parameter1, modes[0], position, int64(in()))
 	return startPosition + 2
 }
 
-func do4Command(commands []int64, startPosition int, modes []int, position int, output chan int64, state chan int) int {
+func do4Command(commands []int64, startPosition int, modes []int, position int, out output) int {
 	parameter1 := commands[startPosition+1]
-	state <- 4
-	output <- handleModeRead(commands, parameter1, modes[0], position)
+	out(handleModeRead(commands, parameter1, modes[0], position))
 	return startPosition + 2
 }
 
@@ -125,7 +126,7 @@ func parseCommand(command int64) (opCode int, mode []int) {
 	return int(code), paramMode
 }
 
-func doCommands(commands []int64, input chan int, output chan int64, state chan int) {
+func doCommands(commands []int64, in input, out output) {
 	instructionPointer := 0
 	position := 0
 	for {
@@ -136,9 +137,9 @@ func doCommands(commands []int64, input chan int, output chan int64, state chan 
 		case 2:
 			instructionPointer = do2Command(commands, instructionPointer, modes, position)
 		case 3:
-			instructionPointer = do3Command(commands, instructionPointer, modes, position, input, state)
+			instructionPointer = do3Command(commands, instructionPointer, modes, position, in)
 		case 4:
-			instructionPointer = do4Command(commands, instructionPointer, modes, position, output, state)
+			instructionPointer = do4Command(commands, instructionPointer, modes, position, out)
 		case 5:
 			instructionPointer = do5Command(commands, instructionPointer, modes, position)
 		case 6:
@@ -150,7 +151,6 @@ func doCommands(commands []int64, input chan int, output chan int64, state chan 
 		case 9:
 			instructionPointer, position = do9Command(commands, instructionPointer, modes, position)
 		case 99:
-			close(state)
 			return
 		}
 	}
@@ -184,56 +184,68 @@ func main() {
 		log.Fatal(err)
 	}
 	memory := toInt(strings.Split(data, ","))
-	memory = append(memory, make([]int64, 100)...)
+	memory = append(memory, make([]int64, 1000)...)
+	x, y := 0, 0
 	count := 0
-	for x := 0; x < 50; x++ {
-		for y := 0; y < 50; y++ {
+	for y = 0; y < 50; y++ {
+		for x = 0; x < 50; x++ {
 			testMemory := append(memory[:0:0], memory...)
-			input := make(chan int)
-			output := make(chan int64)
-			state := make(chan int)
-			go doCommands(testMemory, input, output, state)
-			if handleIO(input, output, state, x, y) == 1 {
+			in, out, r := handleIO(x, y)
+			doCommands(testMemory, in, out)
+			data := r()
+			if data == 1 {
+				fmt.Print("#")
 				count++
+			} else {
+				fmt.Print("_")
 			}
-			close(output)
-			close(input)
 		}
+		fmt.Println()
 	}
 	fmt.Println(count)
-}
 
-func handleIO(input chan int, output chan int64, state chan int, x int, y int) int {
-	sendX := true
-	count := 0
 	for {
-		progState, ok := <-state
-		if !ok {
+		testMemory := append(memory[:0:0], memory...)
+		in, out, r := handleIO(x, y+99)
+		doCommands(testMemory, in, out)
+		foundBottom := r() == 1
+
+		testMemory = append(memory[:0:0], memory...)
+		in, out, r = handleIO(x+99, y)
+		doCommands(testMemory, in, out)
+		foundRight := r() == 1
+
+		if foundBottom && foundRight {
+			fmt.Println(x*10000 + y)
 			break
 		}
-		if progState == 3 {
-			if sendX {
-				input <- x
-				if x < 50 {
-					x++
-				} else {
-					x = 0
-					y++
-					if y > 49 {
-						break
-					}
-				}
-
-			} else {
-				input <- y
-			}
-			sendX = !sendX
-		} else if progState == 4 {
-			out := <-output
-			if out == 1 {
-				count++
-			}
+		if foundBottom {
+			x -= 101
+			y++
+		} else {
+			x++
 		}
 	}
-	return count
+}
+
+func handleIO(x int, y int) (input, output, result) {
+	sendX := true
+	var data int64 = 0
+	in := func() int {
+		if sendX {
+			sendX = false
+			return x
+		}
+		return y
+	}
+
+	out := func(r int64) {
+		data = r
+	}
+
+	r := func() int64 {
+		return data
+	}
+
+	return in, out, r
 }
