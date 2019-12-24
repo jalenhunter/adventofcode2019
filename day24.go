@@ -4,10 +4,18 @@ import (
 	"bufio"
 	"fmt"
 	"log"
-	"math"
 	"os"
-	"strconv"
+	"sort"
 )
+
+type Level struct {
+	location int
+	data     string
+}
+
+func NewLevel(i int) Level {
+	return Level{i, "0000000000000000000000000"}
+}
 
 const size = 5
 
@@ -21,54 +29,166 @@ func offset(x, y int) int {
 	return x + y*size
 }
 
+func middle(x, y int) bool {
+	return (x == 2 && y == 1) ||
+		(x == 2 && y == 3) ||
+		(x == 1 && y == 2) ||
+		(x == 3 && y == 2)
+}
+
+func edge(x, y int) bool {
+	return x == 0 || x == size-1 || y == 0 || y == size-1
+}
+
 func bug(str string, offset int) bool {
+	if offset < 0 {
+		return false
+	}
 	return str[offset] == '1'
 }
 
-func adjacentBugs(str string, x, y int) int {
+func middleBugCount(level string, x, y int) int {
 	count := 0
-	if left := offset(x-1, y); left >= 0 && bug(str, left) {
+	if x == 1 && y == 2 { //left
+		for y1 := 0; y1 < 5; y1++ {
+			if bug(level, offset(0, y1)) {
+				count++
+			}
+		}
+	}
+	if x == 3 && y == 2 { //right
+		for y1 := 0; y1 < 5; y1++ {
+			if bug(level, offset(size-1, y1)) {
+				count++
+			}
+		}
+	}
+	if x == 2 && y == 1 { //up
+		for x1 := 0; x1 < 5; x1++ {
+			if bug(level, offset(x1, 0)) {
+				count++
+			}
+		}
+	}
+	if x == 2 && y == 3 { //down
+		for x1 := 0; x1 < 5; x1++ {
+			if bug(level, offset(x1, size-1)) {
+				count++
+			}
+		}
+	}
+	return count
+}
+
+func edgeBugCount(level string, x, y int) int {
+	count := 0
+	if x == 0 && bug(level, offset(1, 2)) {
 		count++
 	}
-	if right := offset(x+1, y); right >= 0 && bug(str, right) {
+	if x == size-1 && bug(level, offset(3, 2)) {
 		count++
 	}
-	if top := offset(x, y-1); top >= 0 && bug(str, top) {
+	if y == 0 && bug(level, offset(2, 1)) {
 		count++
 	}
-	if bottom := offset(x, y+1); bottom >= 0 && bug(str, bottom) {
+	if y == size-1 && bug(level, offset(2, 3)) {
 		count++
 	}
 	return count
 }
 
-func do1Minute(str string) string {
-	next := ""
+func findLevel(levels []Level, location int) Level {
+	for _, level := range levels {
+		if level.location == location {
+			return level
+		}
+	}
+	return NewLevel(location)
+}
+
+func adjacentBugs(level Level, x, y int, levels []Level) int {
+	count := 0
+	if left := offset(x-1, y); left >= 0 && bug(level.data, left) {
+		count++
+	}
+	if right := offset(x+1, y); right >= 0 && bug(level.data, right) {
+		count++
+	}
+	if top := offset(x, y-1); top >= 0 && bug(level.data, top) {
+		count++
+	}
+	if bottom := offset(x, y+1); bottom >= 0 && bug(level.data, bottom) {
+		count++
+	}
+	if edge(x, y) {
+		outLevel := findLevel(levels, level.location-1)
+		count += edgeBugCount(outLevel.data, x, y)
+	} else if middle(x, y) {
+		inLevel := findLevel(levels, level.location+1)
+		count += middleBugCount(inLevel.data, x, y)
+
+	}
+	return count
+}
+
+func hasEdgeBugs(level Level) bool {
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
-			adj := adjacentBugs(str, x, y)
-			if bug(str, offset(x, y)) {
-				if adj != 1 {
-					next += "0"
+			if middle(x, y) && bug(level.data, offset(x, y)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasMiddleBugs(level Level) bool {
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			if edge(x, y) && bug(level.data, offset(x, y)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func do1Minute(levels []Level) []Level {
+	next := []Level{}
+	for _, level := range levels { //do all current levels
+		newLevel := ""
+		for y := 0; y < size; y++ {
+			for x := 0; x < size; x++ {
+				adj := adjacentBugs(level, x, y, levels)
+				if x == 2 && y == 2 {
+					newLevel += "0"
+				} else if bug(level.data, offset(x, y)) {
+					if adj != 1 {
+						newLevel += "0"
+					} else {
+						newLevel += "1"
+					}
 				} else {
-					next += "1"
-				}
-			} else {
-				if adj == 1 || adj == 2 {
-					next += "1"
-				} else {
-					next += string(str[offset(x, y)])
+					if adj == 1 || adj == 2 {
+						newLevel += "1"
+					} else {
+						newLevel += string(level.data[offset(x, y)])
+					}
 				}
 			}
 		}
+		next = append(next, Level{level.location, newLevel})
 	}
 	return next
 }
 
-func printBugs(str string) {
+func printBugs(level Level) {
+	fmt.Println("Level: ", level.location)
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
-			if bug(str, offset(x, y)) {
+			if x == 2 && y == 2 {
+				fmt.Print("?")
+			} else if bug(level.data, offset(x, y)) {
 				fmt.Print("#")
 			} else {
 				fmt.Print(".")
@@ -79,14 +199,24 @@ func printBugs(str string) {
 	fmt.Println()
 }
 
-func biodiversity(str string) int64 {
-	var bd int64 = 0
-	for i, c := range str {
-		if c == '1' {
-			bd += int64(math.Pow(2, float64(i)))
+func countSingleLevel(level string) int {
+	count := 0
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			if bug(level, offset(x, y)) {
+				count++
+			}
 		}
 	}
-	return bd
+	return count
+}
+
+func countBugs(levels []Level) int {
+	count := 0
+	for _, level := range levels {
+		count += countSingleLevel(level.data)
+	}
+	return count
 }
 
 func main() {
@@ -96,7 +226,6 @@ func main() {
 		log.Fatal(err)
 	}
 	defer file.Close()
-	seen := make(map[int64]bool)
 	var str = ""
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -112,21 +241,25 @@ func main() {
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(str)
-	printBugs(str)
-	for {
-		i, err := strconv.ParseInt(str, 2, 64)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if seen[i] {
-			fmt.Println(str)
-			fmt.Println(biodiversity(str))
-			break
-		}
-		seen[i] = true
-		str = do1Minute(str)
 
-		printBugs(str)
+	levels := []Level{Level{0, str}}
+	currentIn, currentOut := 0, 0
+	for j := 0; j < 200; j++ {
+		if hasEdgeBugs(findLevel(levels, currentOut)) {
+			currentOut--
+			levels = append(levels, NewLevel(currentOut))
+		}
+		if hasMiddleBugs(findLevel(levels, currentIn)) {
+			currentIn++
+			levels = append(levels, NewLevel(currentIn))
+		}
+		levels = do1Minute(levels)
 	}
+	sort.Slice(levels, func(i, j int) bool {
+		return levels[i].location < levels[j].location
+	})
+	for _, level := range levels {
+		printBugs(level)
+	}
+	fmt.Println("Bug count = ", countBugs(levels))
 }
